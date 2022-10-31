@@ -1,0 +1,6 @@
+asyncio
+typing
+fastapi
+websockets
+uvicorn
+jinja2

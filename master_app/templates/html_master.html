@@ -1,0 +1,80 @@
+<!DOCTYPE html><html>
+    <head>
+        <title>Master</title>
+    </head>
+    <style>
+        body{
+            font-family:sans-serif;
+
+        }
+        div {
+            margin: 0 auto;
+            padding: 24px 48px;
+            background: lightblue;
+            border-radius: 16px;
+            max-width: 45vw;
+        }
+        button {
+            padding: 8px;
+            width: 95px;
+            color: white;
+            background: black;
+            border-radius: 20px;
+        }
+        input {
+            height: 33px;
+        }
+    </style>
+    <body>
+        <div>
+        <h1>Master Chat</h1>
+        <h3>Your ID: <span id="ws-id"></span></h3>
+        <form action="" onsubmit="sendMessage(event)">
+            <input type="text" id="messageText" autocomplete="off"/>
+            <button>Send</button> 
+        </form>
+        <ul id='server_response'>
+            <li id = 'response_list'></li>
+        </ul>
+        <br/>
+        <br/>
+        <br/>
+        <button id="get-log" name="getLog" onclick="getLog()"> Get Log</button>
+        <ul id='messages'>
+            <li id = 'message_list'></li>
+        </ul>
+        <script>
+            var client_id = 'master'
+            document.querySelector("#ws-id").textContent = client_id;
+            var ws = new WebSocket(`ws://127.0.0.1:1208/ws/${client_id}`);
+            ws.onmessage = function(event) {
+                if (event.data.slice(0,2) != 'OK') {
+                    var content = document.createTextNode(event.data)
+                    var current_list = document.getElementById('message_list')
+                    var new_list = document.createElement('li')
+                    new_list.setAttribute('id', 'message_list')
+                    new_list.appendChild(content)
+                    current_list.replaceWith(new_list)
+                } else {
+                    var content = document.createTextNode(event.data)
+                    var current_list = document.getElementById('response_list')
+                    var new_list = document.createElement('li')
+                    new_list.setAttribute('id', 'response_list')
+                    new_list.appendChild(content)
+                    current_list.replaceWith(new_list)
+                }
+            };
+            function sendMessage(event) {
+                var input = document.getElementById("messageText")
+                ws.send(input.value)
+                input.value = ''
+                event.preventDefault()
+            };
+            function getLog(event) {
+                var button = document.getElementById("get-log")
+                ws.send(button.name)
+            }
+        </script>
+            </div>
+    </body>
+</html>

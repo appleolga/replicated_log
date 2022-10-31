@@ -1,0 +1,20 @@
+version: '3'
+services:
+  master:
+    build:
+      context: master_app
+    container_name: master
+    external_links:
+      - secondary:secondary
+    ports:
+      - "12:12"
+  secondary:
+    build:
+      context: secondary_app
+    container_name: secondary
+    ports:
+      - "30:30"
+
+
+
+
