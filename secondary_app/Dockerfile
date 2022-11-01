@@ -1,10 +1,13 @@
-FROM tiangolo/uvicorn-gunicorn-fastapi:python3.9
-WORKDIR ./app
+FROM python:3.8-alpine
+WORKDIR /usr/src/app
 
-COPY ./requirements.txt /app/requirements.txt
+ADD requirements.txt .
 
-RUN pip install --no-cache-dir --upgrade -r /app/requirements.txt
+RUN pip install --trusted-host pypi.python.org --no-cache-dir --upgrade -r requirements.txt
 
-COPY . /app/
+#COPY . ./
 
-ENV APP_MODULE="secondary"
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "3000"]
+#CMD ["uvicorn", "main:app", "--reload", "--host", ]
+
+#ENV APP_MODULE="master"

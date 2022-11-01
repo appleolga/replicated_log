@@ -8,8 +8,8 @@ import uvicorn
 
 from models import Log, ConnectionManager, Message, MessageId
 
-def create_app_instance():
 
+def create_app_instance():
     logging.basicConfig(
         format="%(message)s",
         level=logging.DEBUG,
@@ -34,7 +34,7 @@ def create_app_instance():
         return templates.TemplateResponse("html_master.html", {"request": request})
 
     @master.websocket("/ws/{client_id}")
-    async def websocket_endpoint(websocket: WebSocket, client_id: str):
+    async def websocket_endpoint(websocket: WebSocket):
         await master_conn_manager.accept_connect(websocket)
         print(f'{websocket} connected to master server')
         try:
@@ -42,10 +42,10 @@ def create_app_instance():
                 message_text = await websocket.receive_text()
                 print(f'received message is :{message_text}')
                 if websocket.url.path == '/ws/secondary':
-                    if message_text[0:3]=='uri':
+                    if message_text[0:3] == 'uri':
                         master_conn_manager.secondaries_hosts.append(message_text[3:])
                         print(f'current secondaries hosts list is: {master_conn_manager.secondaries_hosts}')
-                    elif message_text[0:3]=='ACK':
+                    elif message_text[0:3] == 'ACK':
                         ack_message = ast.literal_eval(message_text[3:])
                         print(f'ack_counter_dict in main is {master_conn_manager.ack_counter_dict}')
                         master_conn_manager.ack_counter_dict[ack_message[0]][ack_message[1]] = 1

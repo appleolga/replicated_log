@@ -1,19 +1,28 @@
-version: '3'
+version: '3.8'
+
 services:
   master:
-    build:
-      context: master_app
     container_name: master
+    hostname: master
+    build: ./master_app
+    ports:
+      - "8080:8000"
+    volumes:
+      - ./master_app:/usr/src/app
     external_links:
       - secondary:secondary
-    ports:
-      - "12:12"
   secondary:
-    build:
-      context: secondary_app
     container_name: secondary
+    build: ./secondary_app
     ports:
-      - "30:30"
+      - "3080:3000"
+    volumes:
+      - ./secondary_app:/usr/src/app
+    external_links:
+      - master:master
+
+
+
 
 
 
