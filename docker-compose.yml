@@ -12,10 +12,10 @@ services:
     external_links:
       - secondary:secondary
   secondary:
-    container_name: secondary
+#    container_name: secondary
     build: ./secondary_app
     ports:
-      - "3080:3000"
+      - "3000"
     volumes:
       - ./secondary_app:/usr/src/app
     external_links:
