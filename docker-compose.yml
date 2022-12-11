@@ -7,8 +7,6 @@ services:
     build: ./master_app
     ports:
       - "8080:8000"
-#    volumes:
-#      - ./master_app:/usr/src/app
     external_links:
       - secondary:secondary
   secondary:
@@ -16,8 +14,8 @@ services:
     build: ./secondary_app
     ports:
       - "3000"
-#    volumes:
-#      - ./secondary_app:/usr/src/app
+    depends_on:
+      - "master"
     external_links:
       - master:master
 

@@ -15,8 +15,21 @@ log_config = {
             "class": "logging.StreamHandler",
             "stream": "ext://sys.stderr",
         },
+        "file": {
+            "class": "logging.FileHandler",
+            "formatter": "default",
+            "level": "DEBUG",
+            "filename": "logs/master.log",
+            "mode": "w"
+        }
     },
     "loggers": {
-        "foo-logger": {"handlers": ["default"], "level": "DEBUG"},
+        "rl_logger": {"handlers": ["default", "file"], "level": "DEBUG", "filename": 'log/master.log'},
     },
+    "file_handler": {
+            "level": "DEBUG",
+            "filename": "/log/master.log",
+            "class": "logging.FileHandler",
+            "formatter": "standard"
+    }
 }

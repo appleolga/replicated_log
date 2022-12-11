@@ -1,6 +1,6 @@
 log_config = {
     "version": 1,
-    "disable_existing_loggers": False,
+    "disable_existing_loggers": True,
     "formatters": {
         "default": {
             "()": "uvicorn.logging.DefaultFormatter",
@@ -15,8 +15,21 @@ log_config = {
             "class": "logging.StreamHandler",
             "stream": "ext://sys.stderr",
         },
+        "file": {
+            "class": "logging.FileHandler",
+            "formatter": "default",
+            "level": "DEBUG",
+            "filename": "logs/secondary.log",
+            "mode": "w"
+        }
     },
     "loggers": {
-        "foo-logger": {"handlers": ["default"], "level": "DEBUG"},
+        "rl_logger": {"handlers": ["default", "file"], "level": "DEBUG", "filename": 'log/secondary.log'},
     },
+    "file_handler": {
+            "level": "DEBUG",
+            "filename": "/log/secondary.log",
+            "class": "logging.FileHandler",
+            "formatter": "standard"
+    }
 }

@@ -29,6 +29,7 @@
         <div>
         <h1>Master Chat</h1>
         <h3>Your ID: <span id="ws-id"></span></h3>
+        <h3>Enter your message with write concern after comma. E.g "hello,3" </h3>
         <form action="" onsubmit="sendMessage(event)">
             <input type="text" id="messageText" autocomplete="off"/>
             <button>Send</button> 
@@ -39,16 +40,12 @@
         <br/>
         <br/>
         <br/>
-        <button id="get-log" name="getLog" onclick="getLog()"> Get Log</button>
-        <ul id='messages'>
-            <li id = 'message_list'></li>
-        </ul>
         <script>
             var client_id = 'master'
             document.querySelector("#ws-id").textContent = client_id;
             var ws = new WebSocket(`ws://127.0.0.1:8080/ws/${client_id}`);
             ws.onmessage = function(event) {
-                if (event.data.slice(0,2) != 'OK') {
+                if (event.data.slice(0,2) != 'OK' && event.data.slice(0,4) != 'FAIL' && event.data != '') {
                     var content = document.createTextNode(event.data)
                     var current_list = document.getElementById('message_list')
                     var new_list = document.createElement('li')
@@ -70,10 +67,6 @@
                 input.value = ''
                 event.preventDefault()
             };
-            function getLog(event) {
-                var button = document.getElementById("get-log")
-                ws.send(button.name)
-            }
         </script>
             </div>
     </body>
