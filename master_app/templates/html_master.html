@@ -41,9 +41,9 @@
         <br/>
         <br/>
         <script>
-            var client_id = 'master'
+            var client_id = Date.now()
             document.querySelector("#ws-id").textContent = client_id;
-            var ws = new WebSocket(`ws://127.0.0.1:8080/ws/${client_id}`);
+            var ws = new WebSocket(`ws://127.0.0.1:8080/ws/master/${client_id}`);
             ws.onmessage = function(event) {
                 if (event.data.slice(0,2) != 'OK' && event.data.slice(0,4) != 'FAIL' && event.data != '') {
                     var content = document.createTextNode(event.data)

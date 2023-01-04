@@ -1,12 +1,8 @@
 import logging
-import random
 from collections import namedtuple
 from typing import List, Dict
-import asyncio
 import websockets
 from fastapi import WebSocket
-
-ACK_DELAY = random.randint(30, 60)
 
 logger = logging.getLogger('foo-secondary_logger')
 
@@ -34,24 +30,22 @@ class ReplLog:
         self.message_log: Dict[int, str] = {}
         self.message_log_id_to_send: int = 1
 
-    def send_log(self):
-        prefix = f'Message #{self.message_log_id_to_send} is: '
-        logger.info(f'Current id to send is: {self.message_log_id_to_send}')
-        try:
-            message_log_text_to_send = self.message_log[self.message_log_id_to_send]
-            if self.message_log_id_to_send == max(self.message_log.keys()):
-                message_log_text_to_send += ". This is the last recorded message!"
-            else:
-                self.message_log_id_to_send += 1
-        except KeyError:
-            if self.message_log_id_to_send == 1:
-                prefix = '!!!'
-                message_log_text_to_send = "Message log is empty"
-            else:
-                message_log_text_to_send = "This message was not recorded!"
-        # log_record_to_send = f'{prefix}{message_log_text_to_send}'
-        log_record_to_send = (prefix, message_log_text_to_send)
-        return log_record_to_send
+    async def send_log(self):
+        if self.message_log:
+            try:
+                full_mes = ''
+                for k in range(1, max(self.message_log.keys()) + 1):
+                    prefix = f'#{k}: '
+                    message_log_text_to_send = self.message_log[k]
+                    if k == max(self.message_log.keys()):
+                        message_log_text_to_send += ". This is the last recorded message!"
+                    log_record_to_send = f'{prefix}{message_log_text_to_send}'
+                    full_mes += f' | {log_record_to_send} | '
+            except KeyError:
+                full_mes = 'There are missing messages from the log. Log cannot be retrieved'
+        else:
+            full_mes = 'Log is empty! '
+        return full_mes
 
     def update_message_log(self, message: Message):
         self.message_log[int(message.id)] = message.message

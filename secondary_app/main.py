@@ -7,9 +7,10 @@ from logging.config import dictConfig
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
-from models import ReplLog, ConnectionManager, Message, ACK_DELAY
+from models import ReplLog, ConnectionManager, Message
 from my_log_conf import log_config
 
+ACK_DELAY = random.randint(5, 15)
 
 # PROD
 MY_HOST = socket.gethostname()
@@ -17,7 +18,7 @@ MY_PORT = 3000
 MY_URI = f"{MY_HOST}:{str(MY_PORT)}"
 MASTER_URI = "master:8000"
 
-
+#
 # # TEST
 # MY_HOST = '127.0.0.1'
 # MY_PORT = random.randint(1200, 1500)
@@ -45,11 +46,10 @@ async def send_uri():
 
 
 # exposing get method to print replicated message log from outside
-# it prints one log message at a time until reaches the log's last recorded message
 @app.get("/")
-def print_log():
-    message = r_log.send_log()
-    return {f'{message[0]}:{message[1]}'}
+async def print_log():
+    message = await r_log.send_log()
+    return message
 
 
 # secondary websocket server to receive and process messages from master

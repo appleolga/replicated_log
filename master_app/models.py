@@ -2,8 +2,8 @@ import asyncio
 import json
 import logging
 from logging.config import dictConfig
-import copy
 import random
+import socket
 from collections import namedtuple
 from typing import List, Dict, Set
 import websockets
@@ -12,8 +12,17 @@ from fastapi import WebSocket
 from my_log_conf import log_config
 
 # setting MAX_RETRIES == 0 provides unlimited retires
-MAX_RETRIES = 1
+MAX_RETRIES = 0
+# this parameter is used for all timeouts while opening a connection to a secondary
+URI_CONNECT_TIMEOUTS = 10
 
+# PROD
+MY_HOST = socket.gethostname()
+MY_PORT = 8000
+
+# # TEST
+# MY_HOST = '127.0.0.1'
+# MY_PORT = 8080
 
 dictConfig(log_config)
 logger = logging.getLogger('rl_logger')
@@ -33,39 +42,34 @@ class MessageId:
 
 
 # using named tuple to store each message to be able to access its elements by key-names
-Message = namedtuple('Message', ['id', 'message', 'wc'])
+Message = namedtuple('Message', ['id', 'message', 'wc', 'source'])
 
 
 # utility class to manage replicated log's updates, printouts of messages etc.
 class ReplLog:
     def __init__(self):
         # main log data structure to store message as key = message id, value = {message text, message write concern}
-        self.message_log: Dict[int, List[str, int]] = {}
-        # counter to help retrieve messages in sequence by ids
-        self.message_log_id_to_send: int = 1
+        self.message_log: Dict[int, List[str, int, int]] = {}
 
     async def send_log(self):
-        prefix = f'Message #{self.message_log_id_to_send} is: '
-        logger.info(f'Current id to send is: {self.message_log_id_to_send}')
-        try:
-            message_log_text_to_send = self.message_log[self.message_log_id_to_send][0]
-            if self.message_log_id_to_send == max(self.message_log.keys()):
-                message_log_text_to_send += ". This is the last recorded message!"
-            else:
-                self.message_log_id_to_send += 1
-        except KeyError:
-            if self.message_log_id_to_send == 1:
-                prefix = '!!!'
-                message_log_text_to_send = "Message log is empty"
-            else:
-                message_log_text_to_send = "This message was not recorded!"
-        # log_record_to_send = f'{prefix}{message_log_text_to_send}'
-        log_record_to_send = (prefix, message_log_text_to_send)
-        return log_record_to_send
+        if self.message_log:
+            try:
+                full_mes = ''
+                for k in range(1, max(self.message_log.keys()) + 1):
+                    prefix = f'#{k}: '
+                    message_log_text_to_send = self.message_log[k][0]
+                    if k == max(self.message_log.keys()):
+                        message_log_text_to_send += ". This is the last recorded message!"
+                    log_record_to_send = f'{prefix}{message_log_text_to_send}'
+                    full_mes += f' | {log_record_to_send} | '
+            except KeyError:
+                full_mes = 'There are missing messages from the log. Log cannot be retrieved'
+        else:
+            full_mes = 'Log is empty! '
+        return full_mes
 
-    def update_message_log(self, message: Message):
-        self.message_log[int(message.id)] = [message.message, message.wc]
-        self.message_log_id_to_send = 1
+    def update_message_log(self, message: Message, source: int):
+        self.message_log[int(message.id)] = [message.message, message.wc, source]
         return True
 
 
@@ -80,12 +84,14 @@ class ConnectionManager:
             # data structure to keep record of retries to each connected secondary for a specific message
             # key = message id, value = {secondary host to replicate to, retries number}
             retries_counter: Dict[int, Dict[str, int]] = None,
-            master_socket: WebSocket = None
+            # this dict will keep track of all connected master clients
+            master_sockets: Dict[int, WebSocket] = None
     ) -> None:
-        self.master_socket = master_socket
+        self.master_sockets_counter = 0
         self.secondaries_hosts = secondaries_hosts if secondaries_hosts is not None else set()
         self.ack_counter_dict = ack_counter_dict if ack_counter_dict is not None else {}
         self.retries_counter = retries_counter if retries_counter is not None else {}
+        self.master_sockets = master_sockets if master_sockets is not None else {}
 
     @staticmethod
     async def accept_connect(websocket: WebSocket):
@@ -103,7 +109,9 @@ class ConnectionManager:
         connect_uri = f'ws://{uri}/ws/{node_name}'
         logger.info(f'sending message {message} via {connect_uri}')
         try:
-            async with websockets.connect(connect_uri, ping_timeout=None, open_timeout=None) as link:
+            async with websockets.connect(connect_uri,
+                                          ping_timeout=URI_CONNECT_TIMEOUTS,
+                                          open_timeout=URI_CONNECT_TIMEOUTS) as link:
                 await link.send(prefix + message)
                 logger.info('message sent')
                 sent_res = 1
@@ -117,14 +125,14 @@ class ConnectionManager:
 
     # method to compare the number of received acknowledgements with the message's write concern and
     # generate a corresponding response to the user
-    async def check_write_concern(self, message: Message, sec_to_replicate: int):
+    async def check_write_concern(self, message: Message):
         repl_response = None
         while True:
             await asyncio.sleep(1)
             received_acks = sum([v for k, v in self.ack_counter_dict[message.id].items() if k != 'resp'])
             if message.wc == 2 and received_acks >= 1:
                 break
-            elif received_acks / sec_to_replicate == 1:
+            elif message.wc == 3 and received_acks >= 2:
                 break
             # resp flag for a message is set to -1 in case replication failed to at least one secondary
             # it is checked only for write concern == 3
@@ -136,21 +144,19 @@ class ConnectionManager:
                 await asyncio.sleep(1)
         if not repl_response:
             repl_response = f'''OK! your message "{message.message}" was replicated
-                                    on at least {received_acks} secondaries 
-                                    out of {sec_to_replicate} connected'''
+                                    on at least {received_acks} secondaries'''
         return repl_response
 
     # main replication logic
-    async def replicate(self, message: Message):
+    async def replicate(self, message: Message, sec_to_replicate: set):
         logger.info('entered replicate')
-        secondaries_no = len(self.secondaries_hosts)
+        secondaries_no = len(sec_to_replicate)
         data = message._asdict()
         wc = data.pop('wc')
         data = json.dumps(data)
         logger.info(f'number of connected secondaries: {secondaries_no}, write concern is {wc}')
         # creating a copy of currently connected secondaries so that in case a new one is added
         # it does not affect current message's replication
-        sec_to_replicate = copy.deepcopy(self.secondaries_hosts)
         logger.info(f'hosts {sec_to_replicate}')
         # initializing a dictionary-counter for retries == 1
         # for all connected secondaries
@@ -163,7 +169,7 @@ class ConnectionManager:
                 logger.info(f'message was sent to {uri}')
             else:
                 self.retries_counter[message.id][uri] += 1
-                if self.retries_counter[message.id][uri] > MAX_RETRIES:
+                if self.retries_counter[message.id][uri] == MAX_RETRIES:
                     # if MAX_RETRIES == 0 this code does not get executed (it is here for v3 functionality)
                     logger.info(f'''Stopping to try to replicate to {uri}.Exceeded retries number''')
                     logger.info(f'''Message "{message.message}" WAS NOT REPLICATED TO {uri}!!''')
